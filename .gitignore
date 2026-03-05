@@ -1,0 +1,12 @@
+# Generic Linux gitignore rules
+*~
+*.swp
+*.bak
+.DS_Store
+
+# Azure/Cloud Configs
+.azure/
+.env
+*.log
+bin/
+obj/
