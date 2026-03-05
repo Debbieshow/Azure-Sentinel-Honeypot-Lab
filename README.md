@@ -32,7 +32,7 @@
 
 * ​**Intelligence-Driven IP Filtering:** Automating IP blocking based on known malicious infrastructure. 
 
-* ​**Strengthening IAM:** Enforcing MFA, complex passwords, and auditing for legacy accounts. 
+* ​**Credential Hardening:** Enforcing MFA, complex passwords, and auditing for legacy accounts. 
 
 * ​**Continuous Monitoring:** Ensuring 100% visibility across all organizational systems. 
 
