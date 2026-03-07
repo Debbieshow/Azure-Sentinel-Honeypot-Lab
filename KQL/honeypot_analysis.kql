@@ -1,0 +1,53 @@
+// 1. TOTAL ATTACK COUNT
+// Verifies the total failed login attempts
+Syslog
+| where ProcessName == "sshd"
+| where SyslogMessage has "Failed password"
+| count
+
+// 2. GEOGRAPHICAL MAPPING (City & Country)
+// Maps IPs to cityname and countryname for threat visualization
+let GeoIPDB_FULL = _GetWatchlist("geoip");
+Syslog
+| where Facility == "auth" or Facility == "authpriv"
+| where SyslogMessage has "Failed password"
+| extend IPAddress = extract(@"([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})", 1, SyslogMessage)
+| evaluate ipv4_lookup(GeoIPDB_FULL, IPAddress, network, true)
+| summarize FailureCount = count() by IPAddress, latitude, longitude, cityname, countryname
+| project FailureCount, AttackerIp = IPAddress, latitude, longitude, city = cityname, country = countryname
+
+// 3. TOP 10 TARGETED USERNAMES
+// Shows top 10 usernames attackers attempted the most
+Syslog
+| where TimeGenerated between (datetime(2026-02-02) .. datetime(2026-02-08))
+| where Facility == "auth" or Facility == "authpriv"
+| where SyslogMessage has "Failed password"
+| parse SyslogMessage with * "user "UserAttempted" from" *
+| where isnotempty(UserAttempted)
+| summarize AttackCount = count() by UserAttempted
+| order by AttackCount desc
+| take 10
+
+// 4. TOP 10 IPs MATCHED TO CVE ATTACK ATTEMPTS
+// Identifies the CVEs attackers attempted to exploit
+Syslog
+| where TimeGenerated between (datetime(2026-02-02) .. datetime(2026-02-08))
+| where ProcessName == "sshd"
+| extend PotentialCVE = case(
+    SyslogMessage has "user unknown", "CVE-2018-15473 (User Enumeration)",
+    SyslogMessage has "pam_unix" and SyslogMessage has "failure", "CVE-2024-6387 (regreSSHion)",
+    SyslogMessage has "bad protocol version", "CVE-2001-0572 (Protocol Downgrade)",
+    SyslogMessage has "kex_exchange_identification", "CVE-2023-48795 (Terrapin Attack)",
+    SyslogMessage has "extra data before userauth", "CVE-2019-16905 (Memory Corruption)", "Standard Brute Force Pattern"
+    )
+| where PotentialCVE != "Standard Brute Force Pattern"
+| summarize Frequency = count() by PotentialCVE
+| order by Frequency desc
+
+// 5. PEAK ACTIVITY ANALYSIS
+// Identifies the busiest attack hours
+Syslog
+| where SyslogMessage has "Failed password"
+| where TimeGenerated between (datetime(2026-02-02) .. datetime(2026-02-08))
+| summarize Attemptcount = count() by bin (TimeGenerated, 1hr)
+| render timechart
